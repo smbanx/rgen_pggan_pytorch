@@ -3,7 +3,7 @@
 
 import os,sys
 import torch
-from config import config
+from .config import config
 from torch.autograd import Variable
 import utils as utils
 

@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from torch.autograd import Variable
-from custom_layers import *
+from .custom_layers import *
 import copy
 
 
