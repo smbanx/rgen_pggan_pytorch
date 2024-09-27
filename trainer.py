@@ -1,6 +1,6 @@
 from . import dataloader as DL
 from .config import config
-import network as net
+import .network as net
 from math import floor, ceil
 import os, sys
 import torch
