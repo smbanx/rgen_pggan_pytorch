@@ -8,7 +8,7 @@ import torchvision.transforms as transforms
 from torch.autograd import Variable
 from torch.optim import Adam
 from tqdm import tqdm
-import tf_recorder as tensorboard
+# import tf_recorder as tensorboard
 import utils as utils
 import numpy as np
 # import tensorflow as tf
@@ -73,9 +73,9 @@ class trainer:
         self.renew_everything()
         
         # tensorboard
-        self.use_tb = config.use_tb
-        if self.use_tb:
-            self.tb = tensorboard.tf_recorder()
+        self.use_tb = False
+        '''if self.use_tb:
+            self.tb = tensorboard.tf_recorder()'''
         
 
     def resl_scheduler(self):
