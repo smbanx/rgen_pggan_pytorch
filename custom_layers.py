@@ -110,7 +110,7 @@ class equalized_conv2d(nn.Module):
         self.conv.weight.data.copy_(self.conv.weight.data/self.scale)
 
     def forward(self, x):
-        x = self.conv(x.mul(self.scale))
+        x = self.conv(x.mul(self.scale.to('cuda')))
         return x + self.bias.view(1,-1,1,1).expand_as(x)
         
  
