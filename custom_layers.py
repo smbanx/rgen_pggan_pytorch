@@ -143,7 +143,7 @@ class equalized_linear(nn.Module):
         self.linear.weight.data.copy_(self.linear.weight.data/self.scale)
         
     def forward(self, x):
-        x = self.linear(x.mul(self.scale))
+        x = self.linear(x.mul(self.scale.to('cuda')))
         return x + self.bias.view(1,-1).expand_as(x)
 
 

@@ -9,7 +9,7 @@ from torch.autograd import Variable
 from torch.optim import Adam
 from tqdm import tqdm
 # import tf_recorder as tensorboard
-import utils as utils
+from . import utils as utils
 import numpy as np
 # import tensorflow as tf
 

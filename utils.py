@@ -80,9 +80,9 @@ def make_summary(writer, key, value, step):
 
 def mkdir(path):
     if os.name == 'nt':
-        os.system('mkdir {}'.format(path.replace('/', '\\')))
+        os.system('mkdir "{}"'.format(path.replace('/', '\\')))
     else:
-        os.system('mkdir -r {}'.format(path))
+        os.system('mkdir -p {}'.format(path))
 
 
 import torch
