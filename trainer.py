@@ -5,7 +5,10 @@ from . import dataloader as DL
 from .config import config
 from . import network as net
 from math import floor, ceil
+from datetime import datetime
 import os, sys
+import re
+
 import torch
 import torchvision.transforms as transforms
 from torch.autograd import Variable
@@ -74,17 +77,18 @@ class trainer:
                 self.D = torch.nn.DataParallel(self.D, device_ids=gpus).cuda()
 
         # Load discriminator & generator checkpoints
-        D_checkpoint = torch.load(PROJECT_ROOT.joinpath("pggan/repo/model/dis_R5_T2300.pth.tar"))
-        G_checkpoint = torch.load(PROJECT_ROOT.joinpath("pggan/repo/model/gen_R5_T2300.pth.tar"))
-        # Grow network according to checkpoint resl
-        new_resl = D_checkpoint['resl']
-        for resl in range(3, floor(new_resl) + 1):
-            self.lr = self.lr * float(self.config.lr_decay)
-            self.G.module.flush_network()
-            self.D.module.flush_network()
-            self.G.module.grow_network(resl)
-            self.D.module.grow_network(resl)
-        self.resl = new_resl
+        if config.resume_training and os.path.exists(config.resume_training):
+            D_checkpoint = torch.load(PROJECT_ROOT.joinpath("pggan/repo/model/dis_R5_T2300.pth.tar"))
+            G_checkpoint = torch.load(PROJECT_ROOT.joinpath("pggan/repo/model/gen_R5_T2300.pth.tar"))
+            # Grow network according to checkpoint resl
+            new_resl = D_checkpoint['resl']
+            for resl in range(3, floor(new_resl) + 1):
+                self.lr = self.lr * float(self.config.lr_decay)
+                self.G.module.flush_network()
+                self.D.module.flush_network()
+                self.G.module.grow_network(resl)
+                self.D.module.grow_network(resl)
+            self.resl = new_resl
 
         # define tensors, ship model to cuda, and get dataloader.
         self.renew_everything()
@@ -95,16 +99,42 @@ class trainer:
             self.tb = tensorboard.tf_recorder()'''
 
         # Load checkpoint
-        self.opt_d.load_state_dict(D_checkpoint['optimizer'])
-        self.opt_g.load_state_dict(G_checkpoint['optimizer'])
-        self.G.module.flush_network()
-        self.D.module.load_state_dict(D_checkpoint['state_dict'])
-        self.G.module.load_state_dict(G_checkpoint['state_dict'])
-        self.globalTick = 2300
-        self.phase = "dstab"
-        self.complete['dis'] = 100.0
+        if config.resume_training and os.path.exists(resume_path):
+            if len(D_checkpoint['state_dict']) == len(self.D.module.state_dict()):
+                self.D.module.load_state_dict(D_checkpoint['state_dict'])
+                if len(D_checkpoint['optimizer']['param_groups'][0]['params']) == len(self.D.module.state_dict()):
+                    self.opt_d.load_state_dict(D_checkpoint['optimizer'])
+                else:
+                    self.opt_d.load_state_dict(D_checkpoint['optimizer'])
+                    self.D.module.flush_network()
+            else:
+                self.opt_d.load_state_dict(D_checkpoint['optimizer'])
+                self.D.module.flush_network()
+                self.D.module.load_state_dict(D_checkpoint['state_dict'])
+            if len(G_checkpoint['state_dict']) == len(self.G.module.state_dict()):
+                self.G.module.load_state_dict(G_checkpoint['state_dict'])
+                if len(G_checkpoint['optimizer']['param_groups'][0]['params']) == len(self.G.module.state_dict()):
+                    self.opt_g.load_state_dict(G_checkpoint['optimizer'])
+                else:
+                    self.opt_g.load_state_dict(G_checkpoint['optimizer'])
+                    self.G.module.flush_network()
+            else:
+                self.opt_g.load_state_dict(G_checkpoint['optimizer'])
+                self.G.module.flush_network()
+                self.G.module.load_state_dict(G_checkpoint['state_dict'])
+            # match = re.search(r"R\d_T(\d*).pth.tar", "pggan/repo/model/dis_R6_T2400.pth.tar")
+            # self.globalTick = int(match(1))
+            self.globalTick = D_checkpoint['globalTick']
+            self.globalIter = D_checkpoint['globalIter']
+            self.phase = D_checkpoint['phase']
+            self.stack = D_checkpoint['stack']
+            self.lr = D_checkpoint['learning_rate']
+            self.epoch = D_checkpoint['epoch']
+            self.complete['dis'] = D_checkpoint['complete']
+            self.complete['gen'] = G_checkpoint['complete']
+            self.flag_flush_dis = D_checkpoint['flush']
+            self.flag_flush_gen = G_checkpoint['flush']
 
-        # self.renew_everything()
 
     def resl_scheduler(self):
         '''
@@ -358,7 +388,9 @@ class trainer:
                 'stack': self.stack,
                 'learning_rate': self.lr,
                 'phase': self.phase,
-                'complete': self.complete['gen']
+                'kimgs': self.kimgs,
+                'complete': self.complete['gen'],
+                'flush': self.flag_flush_gen
             }
             return state
         elif target == 'dis':
@@ -372,7 +404,9 @@ class trainer:
                 'stack': self.stack,
                 'learning_rate': self.lr,
                 'phase': self.phase,
-                'complete': self.complete['dis']
+                'kimgs': self.kimgs,
+                'complete': self.complete['dis'],
+                'flush': self.flag_flush_dis
             }
             return state
 
@@ -383,8 +417,9 @@ class trainer:
             else:
                 os.system('mkdir -p {}'.format(path))
         # save every 100 tick if the network is in stab phase.
-        ndis = 'dis_R{}_T{}.pth.tar'.format(int(floor(self.resl)), self.globalTick)
-        ngen = 'gen_R{}_T{}.pth.tar'.format(int(floor(self.resl)), self.globalTick)
+        curr_time = datetime.now()
+        ndis = 'dis_R{}_T{}_{}.pth.tar'.format(int(floor(self.resl)), self.globalTick, str(curr_time))
+        ngen = 'gen_R{}_T{}_{}.pth.tar'.format(int(floor(self.resl)), self.globalTick, str(curr_time))
         if self.globalTick % 50 == 0:
             if self.phase == 'gstab' or self.phase == 'dstab' or self.phase == 'final':
                 save_path = os.path.join(path, ndis)

@@ -9,6 +9,7 @@ parser = argparse.ArgumentParser('PGGAN')
 parser.add_argument('--train_data_root', type=str, default='/home/sbanks/retina/rgen-pggan-pytorch')
 parser.add_argument('--random_seed', type=int, default=int(time.time()))
 parser.add_argument('--n_gpu', type=int, default=1)             # for Multi-GPU training.
+parser.add_argument('--resume_training', type=str, default='')
 
 ## training parameters.
 parser.add_argument('--lr', type=float, default=0.001)          # learning rate.
