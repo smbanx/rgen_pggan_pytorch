@@ -77,9 +77,10 @@ class trainer:
                 self.D = torch.nn.DataParallel(self.D, device_ids=gpus).cuda()
 
         # Load discriminator & generator checkpoints
-        if config.resume_training and os.path.exists(config.resume_training):
-            D_checkpoint = torch.load(PROJECT_ROOT.joinpath("pggan/repo/model/dis_R5_T2300.pth.tar"))
-            G_checkpoint = torch.load(PROJECT_ROOT.joinpath("pggan/repo/model/gen_R5_T2300.pth.tar"))
+        resume_path = PROJECT_ROOT.joinpath(config.resume_training)
+        if config.resume_training and os.path.exists(resume_path):
+            D_checkpoint = torch.load(resume_path)
+            G_checkpoint = torch.load(resume_path)
             # Grow network according to checkpoint resl
             new_resl = D_checkpoint['resl']
             for resl in range(3, floor(new_resl) + 1):
