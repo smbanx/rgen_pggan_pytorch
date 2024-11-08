@@ -8,6 +8,7 @@ from math import floor, ceil
 from datetime import datetime
 import os, sys
 import re
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
 
 import torch
 import torchvision.transforms as transforms
@@ -77,10 +78,13 @@ class trainer:
                 self.D = torch.nn.DataParallel(self.D, device_ids=gpus).cuda()
 
         # Load discriminator & generator checkpoints
-        resume_path = PROJECT_ROOT.joinpath(config.resume_training)
-        if config.resume_training and os.path.exists(resume_path):
-            D_checkpoint = torch.load(resume_path)
-            G_checkpoint = torch.load(resume_path)
+        if config.resume_training_D and config.resume_training_G:
+            resume_training = True
+        resume_path_D = PROJECT_ROOT.joinpath(config.resume_training_D)
+        resume_path_G = PROJECT_ROOT.joinpath(config.resume_training_G)
+        if resume_training and os.path.exists(resume_path_D) and os.path.exists(resume_path_G):
+            D_checkpoint = torch.load(resume_path_D)
+            G_checkpoint = torch.load(resume_path_G)
             # Grow network according to checkpoint resl
             new_resl = D_checkpoint['resl']
             for resl in range(3, floor(new_resl) + 1):
@@ -99,43 +103,31 @@ class trainer:
         '''if self.use_tb:
             self.tb = tensorboard.tf_recorder()'''
 
+        self.lr = D_checkpoint['learning_rate']
+
         # Load checkpoint
-        if config.resume_training and os.path.exists(resume_path):
-            if len(D_checkpoint['state_dict']) == len(self.D.module.state_dict()):
-                self.D.module.load_state_dict(D_checkpoint['state_dict'])
-                if len(D_checkpoint['optimizer']['param_groups'][0]['params']) == len(self.D.module.state_dict()):
-                    self.opt_d.load_state_dict(D_checkpoint['optimizer'])
-                else:
-                    self.opt_d.load_state_dict(D_checkpoint['optimizer'])
-                    self.D.module.flush_network()
-            else:
-                self.opt_d.load_state_dict(D_checkpoint['optimizer'])
+        if resume_training and os.path.exists(resume_path_D) and os.path.exists(resume_path_G):
+            self.opt_d.load_state_dict(D_checkpoint['optimizer'])
+            if not len(D_checkpoint['state_dict']) == len(self.D.module.state_dict()):
                 self.D.module.flush_network()
-                self.D.module.load_state_dict(D_checkpoint['state_dict'])
-            if len(G_checkpoint['state_dict']) == len(self.G.module.state_dict()):
-                self.G.module.load_state_dict(G_checkpoint['state_dict'])
-                if len(G_checkpoint['optimizer']['param_groups'][0]['params']) == len(self.G.module.state_dict()):
-                    self.opt_g.load_state_dict(G_checkpoint['optimizer'])
-                else:
-                    self.opt_g.load_state_dict(G_checkpoint['optimizer'])
-                    self.G.module.flush_network()
-            else:
-                self.opt_g.load_state_dict(G_checkpoint['optimizer'])
+            self.D.module.load_state_dict(D_checkpoint['state_dict'])
+            self.opt_g.load_state_dict(G_checkpoint['optimizer'])
+            if not len(G_checkpoint['state_dict']) == len(self.G.module.state_dict()):
                 self.G.module.flush_network()
-                self.G.module.load_state_dict(G_checkpoint['state_dict'])
+            self.G.module.load_state_dict(G_checkpoint['state_dict'])
             # match = re.search(r"R\d_T(\d*).pth.tar", "pggan/repo/model/dis_R6_T2400.pth.tar")
             # self.globalTick = int(match(1))
             self.globalTick = D_checkpoint['globalTick']
             self.globalIter = D_checkpoint['globalIter']
             self.phase = D_checkpoint['phase']
             self.stack = D_checkpoint['stack']
-            self.lr = D_checkpoint['learning_rate']
             self.epoch = D_checkpoint['epoch']
             self.complete['dis'] = D_checkpoint['complete']
             self.complete['gen'] = G_checkpoint['complete']
             self.flag_flush_dis = D_checkpoint['flush']
             self.flag_flush_gen = G_checkpoint['flush']
 
+            self.renew_everything()
 
     def resl_scheduler(self):
         '''
@@ -410,6 +402,25 @@ class trainer:
                 'flush': self.flag_flush_dis
             }
             return state
+        else:
+            state = {
+                'resl': self.resl,
+                'state_dict_D': self.D.module.state_dict(),
+                'state_dict_G': self.G.module.state_dict(),
+                'optimizer': self.opt_d.state_dict(),
+                'epoch': self.epoch,
+                'globalTick': self.globalTick,
+                'globalIter': self.globalIter,
+                'stack': self.stack,
+                'learning_rate': self.lr,
+                'phase': self.phase,
+                'kimgs': self.kimgs,
+                'complete_D': self.complete['dis'],
+                'complete_G': self.complete['gen'],
+                'flush': self.flag_flush_dis
+            }
+            return state
+
 
     def snapshot(self, path):
         if not os.path.exists(path):
